@@ -7,7 +7,7 @@ fn main() {
     let matches = clap::App::new("Set brightness")
         .about("Tool to set the screen brightness on arch with intel_brightness")
         .author("Felix Kaasa")
-        .version("0.2")
+        .version("1.0")
         .arg(
             Arg::with_name("Percentage")
                 .value_name("PERCENTAGE")
