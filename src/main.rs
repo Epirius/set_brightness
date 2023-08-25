@@ -1,4 +1,6 @@
 use clap::Arg;
+use std::fs;
+use std::path::Path;
 use std::process::Command;
 
 fn main() {
@@ -25,15 +27,22 @@ fn main() {
         eprintln!("ERROR: Percentage can not be over 100");
         std::process::exit(2);
     }
-    set_brightness(percentage.into());
+
+    let max_pwr = match get_max_power() {
+        Ok(max) => max,
+        Err(e) => {
+            eprintln!("ERROR: {}", e);
+            std::process::exit(4);
+        }
+    };
+    let percentage: f32 = percentage as f32 / 100.0;
+    let pwr: u32 = (percentage * max_pwr as f32) as u32;
+    set_brightness(pwr);
+
     std::process::exit(0);
 }
 
-fn set_brightness(percentage: u32) {
-    //TODO check if the brightness is higher than what we want to set it to before setting it.
-    let max_pwr: f32 = 96000.0;
-    let percentage: f32 = percentage as f32 / 100.0;
-    let pwr: u32 = (percentage * max_pwr) as u32;
+fn set_brightness(pwr: u32) {
     let command = format!(
         "echo {} > /sys/class/backlight/intel_backlight/brightness",
         pwr
@@ -48,4 +57,12 @@ fn set_brightness(percentage: u32) {
             std::process::exit(3)
         }
     };
+}
+
+fn get_max_power() -> Result<u32, Box<dyn std::error::Error>> {
+    let base_path = Path::new("/sys/class/backlight/intel_backlight");
+    let max_power: u32 = fs::read_to_string(base_path.join("max_brightness"))?
+        .trim()
+        .parse()?;
+    Ok(max_power)
 }
