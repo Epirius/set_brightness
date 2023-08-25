@@ -5,7 +5,7 @@ fn main() {
     let matches = clap::App::new("Set brightness")
         .about("Tool to set the screen brightness on arch with intel_brightness")
         .author("Felix Kaasa")
-        .version("0.1")
+        .version("0.2")
         .arg(
             Arg::with_name("Percentage")
                 .value_name("PERCENTAGE")
@@ -17,16 +17,14 @@ fn main() {
     let percentage = match matches.value_of("Percentage").unwrap().parse::<u8>() {
         Ok(val) => val,
         Err(_) => {
-            println!("ERROR: Could not parse input as an integer between 1-100");
+            eprintln!("ERROR: Could not parse input as an integer between 1-100");
             std::process::exit(1)
         }
     };
     if percentage > 100 {
-        println!("ERROR: Percentage can not be over 100");
+        eprintln!("ERROR: Percentage can not be over 100");
         std::process::exit(2);
     }
-    println!("{}", percentage);
-    println!("{:?}", matches);
     set_brightness(percentage.into());
     std::process::exit(0);
 }
@@ -44,6 +42,10 @@ fn set_brightness(percentage: u32) {
     let output = Command::new("sh").args(["-c", &command]).output();
     match output {
         Ok(_) => (),
-        Err(_) => std::process::exit(3),
+        Err(e) => {
+            eprintln!("ERROR: could not write to the brightness file");
+            eprintln!("{}", e);
+            std::process::exit(3)
+        }
     };
 }
