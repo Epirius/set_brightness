@@ -1,13 +1,13 @@
 use clap::Arg;
 use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
     let matches = clap::App::new("Set brightness")
         .about("Tool to set the screen brightness on arch with intel_brightness")
         .author("Felix Kaasa")
-        .version("1.0")
+        .version("1.1")
         .arg(
             Arg::with_name("Percentage")
                 .value_name("PERCENTAGE")
@@ -43,26 +43,49 @@ fn main() {
 }
 
 fn set_brightness(pwr: u32) {
-    let command = format!(
-        "echo {} > /sys/class/backlight/intel_backlight/brightness",
-        pwr
-    );
+    if let Ok(base_path) = get_base_path() {
+        let command = format!("echo {} > {}", pwr, base_path.join("brightness").display());
 
-    let output = Command::new("sh").args(["-c", &command]).output();
-    match output {
-        Ok(_) => (),
-        Err(e) => {
-            eprintln!("ERROR: could not write to the brightness file");
-            eprintln!("{}", e);
-            std::process::exit(3)
-        }
-    };
+        let output = Command::new("sh").args(["-c", &command]).output();
+        match output {
+            Ok(_) => (),
+            Err(e) => {
+                eprintln!("ERROR: could not write to the brightness file");
+                eprintln!("{}", e);
+                std::process::exit(3)
+            }
+        };
+    }
 }
 
 fn get_max_power() -> Result<u32, Box<dyn std::error::Error>> {
-    let base_path = Path::new("/sys/class/backlight/intel_backlight");
-    let max_power: u32 = fs::read_to_string(base_path.join("max_brightness"))?
+    let max_power: u32 = fs::read_to_string(get_base_path()?.join("max_brightness"))?
         .trim()
         .parse()?;
     Ok(max_power)
+}
+
+fn get_base_path() -> Result<PathBuf, std::io::Error> {
+    let path = PathBuf::from("/sys/class/backlight");
+    for dir in path.read_dir()? {
+        let dir = dir?;
+        let metadata = std::fs::metadata(dir.path())?;
+        if metadata.is_dir() {
+            let dir_content = std::fs::read_dir(dir.path())?;
+            for file in dir_content.into_iter() {
+                let file = file?;
+                if file.file_name() == "brightness" {
+                    return Ok(file
+                        .path()
+                        .parent()
+                        .expect("this path should always have a parent")
+                        .to_path_buf());
+                }
+            }
+        }
+    }
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        "No folder contained brightness",
+    ))
 }
